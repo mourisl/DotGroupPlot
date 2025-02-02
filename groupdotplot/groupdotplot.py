@@ -32,10 +32,11 @@ def DrawPolygon(x, y, radius, n_edge, facecolor, ax):
             cy = radius
             cx, cy = Rotate([cx, cy], (j-0.5) * 2*math.pi/n_edge)
             points.append([cx+x, cy+y])
-        ax.add_patch(patches.Polygon(points, facecolor=color, edgecolor="white"))
+        ax.add_patch(patches.Polygon(points, facecolor=color, edgecolor="white",
+                                    linewidth=0.02*radius))
     else:
         ax.add_patch(patches.Circle([x,y], radius=radius, facecolor=facecolor,
-                                   edgecolor="white"))
+                                   edgecolor="white", linewidth=0.02*radius))
     return ax
 
 def GetLapGap(radius, n_edge):
@@ -127,10 +128,9 @@ def DrawCluster(center_x, center_y, data, hue, hue_map, facecolor, n_edge, radiu
             c = facecolor
             if (h in hue_map):
                 c = hue_map[h]
-            for i in range(cnt):
-                colors.append(c)
+            colors += [c] * cnt
     else:
-        colors = [facecolor for i in range(count)]
+        colors = [facecolor] * count 
     
     region_radius = 0
     if (layout == "lap"):
@@ -216,6 +216,8 @@ def HoneycombPlot(data, group, hue = None, facecolor = 'blue',
         lap_start = 0 
         lap_full = 1
         group_gap = 4 * radius
+        xlim = [0, 0]
+        ylim = [0, 0]
         cluster_regions = [[]] # a list of list, the first list is for each cyle, 
                             #and a second layer  element is a triple, centerx,y and raidus 
                             # The values here is before global shifting
@@ -240,11 +242,12 @@ def HoneycombPlot(data, group, hue = None, facecolor = 'blue',
                         # turning around the group that is closer to the center
                         # The other case is directly pushed a way from previous-lap group
                         px2, py2, pr2 = cluster_regions[lap - 1][k+1]
-                        turning = inner_angle / lap
+                        turning = inner_angle / 2**(lap-1)
                         if ((px**2+py**2) > (px2**2 + py2**2)):
                             px, py, pr = px2, py2, pr2
                             turning = -turning
                         px, py = Rotate([px, py], turning)
+                        
                     pl = math.sqrt(px**2 + py**2)
                     # Put a rough position
                     center_x = px / pl * (pl + pr + r + group_gap)
@@ -259,10 +262,18 @@ def HoneycombPlot(data, group, hue = None, facecolor = 'blue',
                     #px, py, pr = cluster_regions[lap][-1]
                     center_x, center_y = CirclePushOut(center_x ,center_y, r,
                                                   px, py, pr, group_gap)
-                    
+            #DEBUG: test angles
+            #if (i>0):
+            #    print(i, math.acos(center_y / math.sqrt(center_x**2+center_y**2))/(2*math.pi)*360)        
             ax, cluster_radius = DrawCluster(center_x + shift_x, center_y + shift_x, subdf, hue, hue_map, facecolor, n_edge, radius, layout, ax)
             cluster_regions[lap].append([center_x, center_y, cluster_radius])
-            print([center_x, center_y, cluster_radius])
+            
+            xlim[0] = min(xlim[0], center_x - cluster_radius)
+            xlim[1] = max(xlim[1], center_x + cluster_radius)
+            ylim[0] = min(ylim[0], center_y - cluster_radius)
+            ylim[1] = max(ylim[1], center_y + cluster_radius)
+            
+            #print([center_x, center_y, cluster_radius])
             i += 1
             j += 1
             if (i == lap_full):
@@ -282,5 +293,14 @@ def HoneycombPlot(data, group, hue = None, facecolor = 'blue',
                 legend_elements.append(lines.Line2D([0], [0], marker='o', linestyle="None", 
                                                    color=c, label=h, markersize=7))
             ax.legend(handles=legend_elements)
-            
+        
+        xrange = xlim[1] - xlim[0]
+        yrange = ylim[1] - ylim[0]
+        xlim[0] -= xrange * 0.025
+        xlim[1] += xrange * 0.025
+        ylim[0] -= yrange * 0.025
+        ylim[1] += yrange * 0.025
+        ax.set(xlim=(xlim[0] + shift_x, xlim[1] + shift_x),
+              ylim=(ylim[0] + shift_y, ylim[1] + shift_y))
+
         return ax
