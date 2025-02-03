@@ -32,11 +32,11 @@ def DrawPolygon(x, y, radius, n_edge, facecolor, ax):
             cy = radius
             cx, cy = Rotate([cx, cy], (j-0.5) * 2*math.pi/n_edge)
             points.append([cx+x, cy+y])
-        ax.add_patch(patches.Polygon(points, facecolor=color, edgecolor="white",
-                                    linewidth=0.02*radius))
+        ax.add_patch(patches.Polygon(points, facecolor=facecolor, edgecolor="white",
+                                    linewidth=0.01*radius))
     else:
         ax.add_patch(patches.Circle([x,y], radius=radius, facecolor=facecolor,
-                                   edgecolor="white", linewidth=0.02*radius))
+                                   edgecolor="white", linewidth=0.01*radius))
     return ax
 
 def GetLapGap(radius, n_edge):
@@ -170,7 +170,7 @@ def DrawCluster(center_x, center_y, data, hue, hue_map, facecolor, n_edge, radiu
         DrawPolygon(xi, yi, radius, 0, colors[i], ax)
     return ax, region_radius
 
-def groupdotplot(data, group, hue = None, facecolor = 'blue', 
+def dotgroupplot(data, group, hue = None, hue_order = None, facecolor = 'grey', 
                   layout="lap", n_edge=6, radius=1, group_firstlap_n = 6, 
                   palette=None, ax=None):
         """
@@ -181,14 +181,16 @@ def groupdotplot(data, group, hue = None, facecolor = 'blue',
         data: panda dataframe holding the row data
         group: the column name in data that 
         hue: color of the dot based on the column in the dataframe. Use default color if it is not specified in this dictionary
-        facecolor: color of the dot if hue is not specified.
+        hue_order: order to assign the color; otherwise the levels are inferred from the data objects.
+        facecolor: color of the dot if hue is not specified or not in hue_order.
         n_edge: number of edge for each cluster's shape, default 6 is a like heagonal shape
         radius: dot size
         group_firstlap_n: how many groups to put in the first lap (default: 6)
-        layout: how to draw the dot within one cluster. 
+        layout: how to draw the dot within one group. 
                 "spiral": a shape of spiral. 
                 "lap": a dot in the center, and other dots around it as laps.
                 "layer": dots a placed layer by layer 
+        palette: seaborn's palette
         ax: axes objective
         
         Return:
@@ -202,9 +204,11 @@ def groupdotplot(data, group, hue = None, facecolor = 'blue',
         cluster_num = len(groupby)
         
         hue_map = {}
-        if (hue != None):
+        if (hue is not None):    
             hlist = list(data[hue].unique())
-            mypalette = sns.color_palette("bright", len(hlist))
+            if (hue_order is None):
+                hue_order = hlist
+            mypalette = sns.color_palette(palette, len(hlist))
             for i, h in enumerate(hlist):
                 hue_map[h] = mypalette[i]
                 
@@ -287,11 +291,9 @@ def groupdotplot(data, group, hue = None, facecolor = 'blue',
         # Create the legend
         if (hue != None):
             legend_elements = []
-            for h, c in hue_map.items():
-                #legend_elements.append(patches.Circle([0, 0], radius, facecolor=c, 
-                #                                     label=h))
+            for h in hue_order:
                 legend_elements.append(lines.Line2D([0], [0], marker='o', linestyle="None", 
-                                                   color=c, label=h, markersize=7))
+                                                   color=hue_map[h], label=h, markersize=7))
             ax.legend(handles=legend_elements)
         
         xrange = xlim[1] - xlim[0]
