@@ -170,7 +170,7 @@ def DrawCluster(center_x, center_y, data, hue, hue_map, facecolor, n_edge, radiu
         DrawPolygon(xi, yi, radius, 0, colors[i], ax)
     return ax, region_radius
 
-def HoneycombPlot(data, group, hue = None, facecolor = 'blue', 
+def groupdotplot(data, group, hue = None, facecolor = 'blue', 
                   layout="lap", n_edge=6, radius=1, group_firstlap_n = 6, 
                   palette=None, ax=None):
         """
@@ -242,7 +242,7 @@ def HoneycombPlot(data, group, hue = None, facecolor = 'blue',
                         # turning around the group that is closer to the center
                         # The other case is directly pushed a way from previous-lap group
                         px2, py2, pr2 = cluster_regions[lap - 1][k+lap-1]
-                        turning = inner_angle / lap
+                        turning = ((i-lap_start)%lap) * inner_angle / lap
                         #if ((px**2+py**2) > (px2**2 + py2**2)):
                         #    px, py, pr = px2, py2, pr2
                         #    turning = -turning
