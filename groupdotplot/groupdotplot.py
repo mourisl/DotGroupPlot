@@ -236,16 +236,16 @@ def HoneycombPlot(data, group, hue = None, facecolor = 'blue',
                     center_x, center_y = Rotate([0, pr + group_gap + r], inner_angle * (i - lap_start))                    
                 elif (lap > 1):
                     # The position of this group is determined by two in the inner layer and the previous one
-                    k = math.floor((i - lap_start) / 2) # the index in the previous lap
+                    k = math.floor(((i - lap_start)//lap) * (lap - 1)) # the index in the previous lap
                     px, py, pr = cluster_regions[lap - 1][k]
-                    if ((i - lap_start)%2 != 0) :
+                    if ((i - lap_start)%lap != 0) :
                         # turning around the group that is closer to the center
                         # The other case is directly pushed a way from previous-lap group
-                        px2, py2, pr2 = cluster_regions[lap - 1][k+1]
-                        turning = inner_angle / 2**(lap-1)
-                        if ((px**2+py**2) > (px2**2 + py2**2)):
-                            px, py, pr = px2, py2, pr2
-                            turning = -turning
+                        px2, py2, pr2 = cluster_regions[lap - 1][k+lap-1]
+                        turning = inner_angle / lap
+                        #if ((px**2+py**2) > (px2**2 + py2**2)):
+                        #    px, py, pr = px2, py2, pr2
+                        #    turning = -turning
                         px, py = Rotate([px, py], turning)
                         
                     pl = math.sqrt(px**2 + py**2)
