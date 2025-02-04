@@ -107,7 +107,7 @@ def CirclePushOut(x, y, r, x1, y1, r1, gap):
     return nx * (pushd + norm1 * costheta), ny * (pushd + norm1 * costheta)
 
 # Draw one group
-def DrawGroup(center_x, center_y, data, hue, hue_order, hue_map, facecolor, n_edge, radius, layout, ax):
+def DrawGroup(center_x, center_y, data, hue, hue_order, hue_map, hue_style, facecolor, n_edge, radius, layout, ax):
     """
     Draw the plot for one group represent by data
     
@@ -133,7 +133,7 @@ def DrawGroup(center_x, center_y, data, hue, hue_order, hue_map, facecolor, n_ed
             tmpy = lap * lap_gap 
             if (i == 0):
                 tmpx, tmpy = Rotate([tmpx, tmpy], i * 2*math.pi/n_edge)
-                coord.append([tmpx+center_x, tmpy+center_y])
+                coord.append([tmpx, tmpy])
                 i += 1
             else:
                 k = 0
@@ -142,8 +142,8 @@ def DrawGroup(center_x, center_y, data, hue, hue_order, hue_map, facecolor, n_ed
                     tmpx2, tmpy2 = Rotate([tmpx, tmpy], (k+1) * 2*math.pi/n_edge)
                     for l in range(j, min(j + lap, count)):
                         coef = (j + lap - l) / lap
-                        coord.append([coef*tmpx1 + (1-coef)*tmpx2 + center_x, 
-                                      coef*tmpy1 + (1-coef)*tmpy2 + center_y])
+                        coord.append([coef*tmpx1 + (1-coef)*tmpx2, 
+                                      coef*tmpy1 + (1-coef)*tmpy2])
                     k += 1
                 i += lap * n_edge
             lap += 1
@@ -153,11 +153,18 @@ def DrawGroup(center_x, center_y, data, hue, hue_order, hue_map, facecolor, n_ed
     elif (layout == "spiral"):
         return ax
     
-    # Reorder the points from left to right, top to top
-    coord = sorted(coord, key=lambda x:[round(x[0],4), -round(x[1],4)])
-    
     colors = []
     if (hue != None):
+        if (hue_style == "vertical_slice"):
+            # Reorder the points from left to right, top to top
+            coord = sorted(coord, key=lambda x:[round(x[0],4), -round(x[1],4)])
+        elif (hue_style == "horizontal_slice"):
+            coord = sorted(coord, key=lambda x:[-round(x[1],4), round(x[0],4)])
+        elif (hue_style == "pie_slice"):
+            coord = sorted(coord, key=lambda x:[round(-math.atan2(round(x[0],4), round(-x[1],4)),4), round(x[0]**2 + x[1]**2, 4)])
+        else: # "lap"
+            coord = coord
+            
         hue_counts = {h:cnt for h,cnt in data[hue].value_counts().items()}
         used = 0
         for h in hue_order:
@@ -172,29 +179,33 @@ def DrawGroup(center_x, center_y, data, hue, hue_order, hue_map, facecolor, n_ed
     
     #print(x, y)
     for i, (xi, yi) in enumerate(coord):
-        DrawPolygon(xi, yi, radius, 0, colors[i], ax)
+        DrawPolygon(xi+center_x, yi+center_y, radius, 0, colors[i], ax)
     return ax, region_radius
 
 def dotgroupplot(data, group, hue = None, hue_order = None, facecolor = 'grey', 
-                  layout="lap", n_edge=6, radius=1, group_firstlap_n = 6, 
+                  layout="lap", n_edge=6, radius=1, hue_style="vertical_slice", group_firstlap_n = 6, 
                   palette=None, ax=None):
         """
         Draw the honeycomb plot 
         
         Args:
         -----
-        data: panda dataframe holding the row data
-        group: the column name in data that 
-        hue: color of the dot based on the column in the dataframe. Use default color if it is not specified in this dictionary
+        data: panda dataframe holding the raw data
+        group: the column name in data for grouping the rows.
+        hue: color of the dot based on the column in the dataframe. Use default facecolor if it is not specified in this dictionary
         hue_order: order to assign the color; otherwise the levels are inferred from the data objects.
         facecolor: color of the dot if hue is not specified or not in hue_order.
+        layout: how to draw the dot within one group. 
+                "spiral": a shape of spiral. TODO
+                "lap": a dot in the center, and other dots around it as laps. 
         n_edge: number of edge for each group's shape, default 6 is a like heagonal shape
         radius: dot size
+        hue_style: how to add colors witin on group.
+                "vertical_slice": from left to right
+                "horizontal_slice": from top to bottom
+                "pie_slice": similar to a pie chart
+                "lap": in laps
         group_firstlap_n: how many groups to put in the first lap (default: 6)
-        layout: how to draw the dot within one group. 
-                "spiral": a shape of spiral. 
-                "lap": a dot in the center, and other dots around it as laps.
-                "layer": dots a placed layer by layer 
         palette: seaborn's palette
         ax: axes objective
         
@@ -282,7 +293,7 @@ def dotgroupplot(data, group, hue = None, hue_order = None, facecolor = 'grey',
             #DEBUG: test angles
             #if (i>0):
             #    print(i, math.acos(center_y / math.sqrt(center_x**2+center_y**2))/(2*math.pi)*360)        
-            ax, group_radius = DrawGroup(center_x + shift_x, center_y + shift_x, subdf, hue, hue_order, hue_map, facecolor, n_edge, radius, layout, ax)
+            ax, group_radius = DrawGroup(center_x + shift_x, center_y + shift_x, subdf, hue, hue_order, hue_map, hue_style, facecolor, n_edge, radius, layout, ax)
             group_regions[lap].append([center_x, center_y, group_radius])
             
             xlim[0] = min(xlim[0], center_x - group_radius)
