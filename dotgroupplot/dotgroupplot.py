@@ -41,13 +41,13 @@ def DrawPolygon(x, y, radius, n_edge, facecolor, ax):
 
 def GetLapGap(radius, n_edge):
     """
-    The gap between two laps for the same-cluster plotting
+    The gap between two laps for the same-group plotting
     """
     return max([11 / 5 * radius / math.cos(math.pi / n_edge),#  extra 20% in the radius for buffer
                       6 / 5 * radius / math.sin(math.pi / n_edge)] # gap should be large enough so dots in the same lap does not overlap
               )
 
-def EstimateClusterRectangularRegion(center_x, center_y, data, n_edge, radius):
+def EstimateGroupRectangularRegion(center_x, center_y, data, n_edge, radius):
     """
     Estimate the rectangular region 
     
@@ -63,7 +63,7 @@ def EstimateClusterRectangularRegion(center_x, center_y, data, n_edge, radius):
          (center_x +lap_gap * n_lap + radius, \
             center_y + lap_gap * n_lap + radius)
 
-def EstimateClusterCircularRegion(center_x, center_y, data, n_edge, radius):
+def EstimateGroupCircularRegion(center_x, center_y, data, n_edge, radius):
     """
     Esimate the circular region
     
@@ -106,31 +106,19 @@ def CirclePushOut(x, y, r, x1, y1, r1, gap):
     
     return nx * (pushd + norm1 * costheta), ny * (pushd + norm1 * costheta)
 
-# Draw one cluster
-def DrawCluster(center_x, center_y, data, hue, hue_map, facecolor, n_edge, radius, layout, ax):
+# Draw one group
+def DrawGroup(center_x, center_y, data, hue, hue_order, hue_map, facecolor, n_edge, radius, layout, ax):
     """
-    Draw the plot for one cluster represent by data
+    Draw the plot for one group represent by data
     
     Return:
     -----
     axes object
-    radius of the cluster circular region
+    radius of the group circular region
     """
     
     count = len(data)
-    x = []
-    y = []
-    
-    colors = []
-    if (hue != None):
-        hue_counts = []
-        for h, cnt in data[hue].value_counts().items():
-            c = facecolor
-            if (h in hue_map):
-                c = hue_map[h]
-            colors += [c] * cnt
-    else:
-        colors = [facecolor] * count 
+    coord = []
     
     region_radius = 0
     if (layout == "lap"):
@@ -145,8 +133,7 @@ def DrawCluster(center_x, center_y, data, hue, hue_map, facecolor, n_edge, radiu
             tmpy = lap * lap_gap 
             if (i == 0):
                 tmpx, tmpy = Rotate([tmpx, tmpy], i * 2*math.pi/n_edge)
-                x.append(tmpx + center_x)
-                y.append(tmpy + center_y)
+                coord.append([tmpx+center_x, tmpy+center_y])
                 i += 1
             else:
                 k = 0
@@ -155,8 +142,8 @@ def DrawCluster(center_x, center_y, data, hue, hue_map, facecolor, n_edge, radiu
                     tmpx2, tmpy2 = Rotate([tmpx, tmpy], (k+1) * 2*math.pi/n_edge)
                     for l in range(j, min(j + lap, count)):
                         coef = (j + lap - l) / lap
-                        x.append(coef*tmpx1 + (1-coef)*tmpx2 + center_x)
-                        y.append(coef*tmpy1 + (1-coef)*tmpy2 + center_y)
+                        coord.append([coef*tmpx1 + (1-coef)*tmpx2 + center_x, 
+                                      coef*tmpy1 + (1-coef)*tmpy2 + center_y])
                     k += 1
                 i += lap * n_edge
             lap += 1
@@ -165,8 +152,26 @@ def DrawCluster(center_x, center_y, data, hue, hue_map, facecolor, n_edge, radiu
         return ax
     elif (layout == "spiral"):
         return ax
+    
+    # Reorder the points from left to right, top to top
+    coord = sorted(coord, key=lambda x:[round(x[0],4), -round(x[1],4)])
+    
+    colors = []
+    if (hue != None):
+        hue_counts = {h:cnt for h,cnt in data[hue].value_counts().items()}
+        used = 0
+        for h in hue_order:
+            if (h not in hue_counts):
+                continue
+            tmp = hue_counts[h]
+            used += tmp
+            colors += [hue_map[h]] * tmp
+        colors += [facecolor] * (count - used)
+    else:
+        colors = [facecolor] * count 
+    
     #print(x, y)
-    for i, (xi, yi) in enumerate(zip(x, y)):
+    for i, (xi, yi) in enumerate(coord):
         DrawPolygon(xi, yi, radius, 0, colors[i], ax)
     return ax, region_radius
 
@@ -183,7 +188,7 @@ def dotgroupplot(data, group, hue = None, hue_order = None, facecolor = 'grey',
         hue: color of the dot based on the column in the dataframe. Use default color if it is not specified in this dictionary
         hue_order: order to assign the color; otherwise the levels are inferred from the data objects.
         facecolor: color of the dot if hue is not specified or not in hue_order.
-        n_edge: number of edge for each cluster's shape, default 6 is a like heagonal shape
+        n_edge: number of edge for each group's shape, default 6 is a like heagonal shape
         radius: dot size
         group_firstlap_n: how many groups to put in the first lap (default: 6)
         layout: how to draw the dot within one group. 
@@ -201,15 +206,15 @@ def dotgroupplot(data, group, hue = None, hue_order = None, facecolor = 'grey',
         ax = ax or plt.gca()
         
         groupby = data.groupby(group)
-        cluster_num = len(groupby)
+        group_num = len(groupby)
         
         hue_map = {}
         if (hue is not None):    
             hlist = list(data[hue].unique())
             if (hue_order is None):
                 hue_order = hlist
-            mypalette = sns.color_palette(palette, len(hlist))
-            for i, h in enumerate(hlist):
+            mypalette = sns.color_palette(palette, len(hue_order))
+            for i, h in enumerate(hue_order):
                 hue_map[h] = mypalette[i]
                 
         #if (hue != None):
@@ -222,7 +227,7 @@ def dotgroupplot(data, group, hue = None, hue_order = None, facecolor = 'grey',
         group_gap = 4 * radius
         xlim = [0, 0]
         ylim = [0, 0]
-        cluster_regions = [[]] # a list of list, the first list is for each cyle, 
+        group_regions = [[]] # a list of list, the first list is for each cyle, 
                             #and a second layer  element is a triple, centerx,y and raidus 
                             # The values here is before global shifting
         
@@ -233,56 +238,64 @@ def dotgroupplot(data, group, hue = None, hue_order = None, facecolor = 'grey',
             # find the appropriate positions
             center_x = 0
             center_y = 0 
-            x, y, r = EstimateClusterCircularRegion(0, 0, subdf, n_edge, radius)
+            x, y, r = EstimateGroupCircularRegion(0, 0, subdf, n_edge, radius)
             if (lap > 0):
                 if (lap == 1):
-                    px, py, pr = cluster_regions[lap - 1][0]
+                    px, py, pr = group_regions[lap - 1][0]
                     center_x, center_y = Rotate([0, pr + group_gap + r], inner_angle * (i - lap_start))                    
                 elif (lap > 1):
                     # The position of this group is determined by two in the inner layer and the previous one
                     k = math.floor(((i - lap_start)//lap) * (lap - 1)) # the index in the previous lap
-                    px, py, pr = cluster_regions[lap - 1][k]
+                    px, py, pr = group_regions[lap - 1][k]
                     if ((i - lap_start)%lap != 0) :
-                        # turning around the group that is closer to the center
+                        # turning around the group 
                         # The other case is directly pushed a way from previous-lap group
-                        px2, py2, pr2 = cluster_regions[lap - 1][k+lap-1]
+                        px2, py2, pr2 = group_regions[lap - 1][k+lap-1]
                         turning = ((i-lap_start)%lap) * inner_angle / lap
                         #if ((px**2+py**2) > (px2**2 + py2**2)):
                         #    px, py, pr = px2, py2, pr2
                         #    turning = -turning
                         px, py = Rotate([px, py], turning)
                         
-                    pl = math.sqrt(px**2 + py**2)
-                    # Put a rough position
-                    center_x = px / pl * (pl + pr + r + group_gap)
-                    center_y = py / pl * (pl + pr + r + group_gap) 
+                        pl = math.sqrt(px**2 + py**2)
+                        pl2 = math.sqrt(px2**2 + py2**2)
+                        # Put a rough position, should be some where based on the two 
+                        # groups in the previous lap
+                        coef = ((i-lap_start)%lap)/lap
+                        center_x = px / pl * ((1-coef)*pl + coef*pl2 + pr + r + group_gap)
+                        center_y = py / pl * ((1-coef)*pl + coef*pl2 + pr + r + group_gap)   
+                    else: # directly push
+                        pl = math.sqrt(px**2 + py**2)
+                        # Put a rough position
+                        center_x = px / pl * (pl + pr + r + group_gap)
+                        center_y = py / pl * (pl + pr + r + group_gap) 
                         
                     # push away from other dots in the previous lap
-                    for px, py, pr in cluster_regions[lap - 1]:
+                    for px, py, pr in group_regions[lap - 1]:
                         center_x, center_y = CirclePushOut(center_x ,center_y, r,
                                 px, py, pr, group_gap)
                 # The previous groups on the same lap
-                for px, py, pr in cluster_regions[lap]:
-                    #px, py, pr = cluster_regions[lap][-1]
+                for px, py, pr in group_regions[lap]:
+                    #px, py, pr = group_regions[lap][-1]
                     center_x, center_y = CirclePushOut(center_x ,center_y, r,
                                                   px, py, pr, group_gap)
             #DEBUG: test angles
             #if (i>0):
             #    print(i, math.acos(center_y / math.sqrt(center_x**2+center_y**2))/(2*math.pi)*360)        
-            ax, cluster_radius = DrawCluster(center_x + shift_x, center_y + shift_x, subdf, hue, hue_map, facecolor, n_edge, radius, layout, ax)
-            cluster_regions[lap].append([center_x, center_y, cluster_radius])
+            ax, group_radius = DrawGroup(center_x + shift_x, center_y + shift_x, subdf, hue, hue_order, hue_map, facecolor, n_edge, radius, layout, ax)
+            group_regions[lap].append([center_x, center_y, group_radius])
             
-            xlim[0] = min(xlim[0], center_x - cluster_radius)
-            xlim[1] = max(xlim[1], center_x + cluster_radius)
-            ylim[0] = min(ylim[0], center_y - cluster_radius)
-            ylim[1] = max(ylim[1], center_y + cluster_radius)
+            xlim[0] = min(xlim[0], center_x - group_radius)
+            xlim[1] = max(xlim[1], center_x + group_radius)
+            ylim[0] = min(ylim[0], center_y - group_radius)
+            ylim[1] = max(ylim[1], center_y + group_radius)
             
-            #print([center_x, center_y, cluster_radius])
+            #print([center_x, center_y, group_radius])
             i += 1
             j += 1
             if (i == lap_full):
-                cluster_regions[lap].append( cluster_regions[lap][0] )
-                cluster_regions.append([])
+                group_regions[lap].append( group_regions[lap][0] )
+                group_regions.append([])
                 lap += 1
                 j = 0
                 lap_start = i
