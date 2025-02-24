@@ -2,7 +2,7 @@ dotgroupplot
 ======
 
 ### What is it?
-
+A Python package to draw groups of dots. dotgrouplot is inspired by the honeycomb plot in [enclone](https://github.com/10XGenomics/enclone). The major feature of dotgroupplot is to allow various group shapes and coloring schemes, which can mimic the pie chart.
 
 ### Installation
 
